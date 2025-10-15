@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stylish Live Camera Viewer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the video element and main container */
+        :root {
+            --primary-color: #4f46e5; /* Indigo-600 */
+        }
+        /* Custom font import for a professional look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Ensure the video is responsive and centered within its container */
+        #camera-feed {
+            /* Object-fit ensures the video covers the area nicely, preventing black bars */
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
+            background-color: #1f2937; /* Dark background before camera loads */
+            transform: scaleX(-1); /* Mirror the video feed (optional, but common) */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Container Card -->
+    <div class="w-full max-w-xl bg-gray-800 shadow-2xl rounded-3xl p-6 md:p-8 transform transition duration-500 hover:shadow-indigo-500/50">
+
+        <h1 class="text-3xl md:text-4xl font-extrabold text-white mb-2 text-center tracking-tight">
+            Live Stream Access
+        </h1>
+        <p class="text-gray-400 mb-6 text-center text-sm md:text-base">
+            Grant permission to start the secure local video feed.
+        </p>
+
+        <!-- Video Display Area (The "iFrame" container requested by the user) -->
+        <div id="video-container" class="relative w-full aspect-video bg-gray-900 rounded-xl overflow-hidden shadow-lg border-2 border-indigo-500/50">
+            <!-- The video element itself -->
+            <video id="camera-feed" autoplay playsinline></video>
+            
+            <!-- Status overlay -->
+            <div id="status-overlay" class="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-white p-4 transition-opacity duration-300">
+                <div class="text-center">
+                    <svg id="loading-spinner" class="animate-spin h-8 w-8 text-indigo-400 mx-auto mb-3 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p id="status-message" class="text-lg font-medium">Waiting for camera permission...</p>
+                    <p id="error-details" class="text-sm text-red-400 mt-2 hidden"></p>
+                </div>
+            </div>
+        </div>
+
+        <button id="start-button" class="mt-6 w-full py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/40 hover:bg-indigo-700 transition duration-150 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-indigo-500/50 disabled:bg-gray-500 disabled:shadow-none" onclick="startCamera()">
+            Activate Camera Feed
+        </button>
+        
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('camera-feed');
+        const statusOverlay = document.getElementById('status-overlay');
+        const statusMessage = document.getElementById('status-message');
+        const errorDetails = document.getElementById('error-details');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const startButton = document.getElementById('start-button');
+
+        /**
+         * Hides the status overlay and displays the video.
+         */
+        function hideStatus() {
+            statusOverlay.classList.add('opacity-0');
+            setTimeout(() => {
+                statusOverlay.classList.add('hidden');
+            }, 300); // Wait for transition
+            videoElement.style.opacity = '1';
+        }
+
+        /**
+         * Shows the status overlay with a custom message.
+         * @param {string} message - The message to display.
+         * @param {boolean} showLoading - Whether to show the spinner.
+         */
+        function showStatus(message, showLoading = false) {
+            statusOverlay.classList.remove('hidden', 'opacity-0');
+            statusOverlay.classList.remove('opacity-0');
+            videoElement.style.opacity = '0';
+            statusMessage.textContent = message;
+            loadingSpinner.classList.toggle('hidden', !showLoading);
+            errorDetails.classList.add('hidden');
+        }
+
+        /**
+         * Shows an error message and stops the spinner.
+         * @param {string} message - The main error message.
+         * @param {string} detail - The technical error detail.
+         */
+        function showError(message, detail = '') {
+            showStatus(message, false);
+            errorDetails.textContent = detail;
+            errorDetails.classList.remove('hidden');
+            startButton.disabled = true;
+            startButton.textContent = "Camera Failed";
+        }
+
+        /**
+         * Attempts to access the user's camera stream.
+         */
+        async function startCamera() {
+            startButton.disabled = true;
+            startButton.textContent = "Starting...";
+            showStatus("Requesting camera access...", true);
+
+            // Check for media devices support
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError("Your browser does not support the camera API.", "Try updating your browser or using a modern one like Chrome, Firefox, or Safari.");
+                return;
+            }
+
+            try {
+                // Request video stream access
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                
+                // Set the stream as the source for the video element
+                videoElement.srcObject = stream;
+
+                // When the video starts playing, hide the status overlay
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    hideStatus();
+                    startButton.textContent = "Camera Active";
+                    startButton.classList.replace('bg-indigo-600', 'bg-green-600');
+                    startButton.classList.replace('shadow-indigo-500/40', 'shadow-green-500/40');
+                };
+
+            } catch (err) {
+                console.error("Error accessing the camera:", err);
+                
+                let errorMessage = "Permission Denied.";
+                let errorDetail = "You must grant camera access to use this feature.";
+
+                if (err.name === 'NotAllowedError') {
+                    errorMessage = "Access Blocked.";
+                    errorDetail = "Please check your browser settings to allow camera access for this site.";
+                } else if (err.name === 'NotFoundError') {
+                    errorMessage = "No Camera Found.";
+                    errorDetail = "Ensure a webcam is connected and enabled on your device.";
+                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                    errorMessage = "Camera In Use.";
+                    errorDetail = "Another application (like Zoom or another tab) is currently using the camera.";
+                }
+
+                showError(errorMessage, errorDetail);
+                startButton.disabled = false;
+                startButton.textContent = "Try Again";
+                startButton.classList.replace('bg-indigo-600', 'bg-red-600');
+                startButton.classList.replace('shadow-indigo-500/40', 'shadow-red-500/40');
+
+            }
+        }
+
+        // Initialize status on load
+        window.onload = () => {
+             showStatus("Ready to activate camera.");
+        };
+
+    </script>
+</body>
+</html>
